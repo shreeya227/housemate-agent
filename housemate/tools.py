@@ -29,6 +29,7 @@ class House:
     pantry: dict
     grocery_list: list = field(default_factory=list)
     tasks: list = field(default_factory=list)
+    decisions: list = field(default_factory=list)
 
     def __post_init__(self):
         self.chat_index = BM25Index(message_docs(self.messages))
@@ -65,6 +66,17 @@ class House:
             for r in recipes[:k]
         ]}
 
+    def read_chat(self, offset: int = 0, limit: int = 50) -> dict:
+        """Read the chat in order, one page at a time (for tasks that need every message)."""
+        page = self.messages[offset:offset + limit]
+        next_offset = offset + len(page)
+        return {
+            "results": [{"id": m.id, "author": m.author,
+                         "sent_at": m.sent_at.strftime("%Y-%m-%d %H:%M"), "text": m.text}
+                        for m in page],
+            "next_offset": next_offset if next_offset < len(self.messages) else None,
+        }
+
     def check_pantry(self) -> dict:
         return {"pantry": dict(self.pantry)}
 
@@ -89,13 +101,28 @@ class House:
         self.grocery_list.append({"item": name, "reason": reason})
         return {"status": "added", "item": name, "list_size": len(self.grocery_list)}
 
-    def add_task(self, title: str, assignee: str, due: str = "", source_ids: list | None = None) -> dict:
-        source_ids = source_ids or []
+    def _check_sources(self, source_ids: list) -> str | None:
+        """Refuse made-up citations: every record must point to real messages."""
         known = {m.id for m in self.messages}
         unknown = [s for s in source_ids if s not in known]
-        if unknown:
-            # Refuse made-up citations: every task must point to real messages.
-            return {"error": f"Unknown source message ids: {unknown}"}
+        return f"Unknown source message ids: {unknown}" if unknown else None
+
+    def record_decision(self, topic: str, summary: str, source_ids: list) -> dict:
+        if not source_ids:
+            return {"error": "A decision needs at least one source message id"}
+        problem = self._check_sources(source_ids)
+        if problem:
+            return {"error": problem}
+        decision = {"id": f"dec-{len(self.decisions) + 1:03d}", "topic": topic,
+                    "summary": summary, "source_ids": source_ids}
+        self.decisions.append(decision)
+        return {"status": "recorded", "decision": decision}
+
+    def add_task(self, title: str, assignee: str, due: str = "", source_ids: list | None = None) -> dict:
+        source_ids = source_ids or []
+        problem = self._check_sources(source_ids)
+        if problem:
+            return {"error": problem}
         task = {"id": f"task-{len(self.tasks) + 1:03d}", "title": title,
                 "assignee": assignee, "due": due, "source_ids": source_ids}
         self.tasks.append(task)
@@ -122,6 +149,14 @@ TOOL_SCHEMAS = [
         }, "required": ["query"]},
     },
     {
+        "name": "read_chat",
+        "description": "Read the house chat in order, page by page. Use this when you need every message (for example to find all decisions), not just the best matches. Keep calling with next_offset until it is null.",
+        "input_schema": {"type": "object", "properties": {
+            "offset": {"type": "integer", "description": "Index of the first message to read (default 0)"},
+            "limit": {"type": "integer", "description": "Messages per page (default 50)"},
+        }},
+    },
+    {
         "name": "check_pantry",
         "description": "List the ingredients currently in the shared pantry.",
         "input_schema": {"type": "object", "properties": {}},
@@ -141,6 +176,15 @@ TOOL_SCHEMAS = [
             "item": {"type": "string"},
             "reason": {"type": "string", "description": "Why it is needed, e.g. 'for chana masala'"},
         }, "required": ["item"]},
+    },
+    {
+        "name": "record_decision",
+        "description": "Record something the house agreed on. Only record real agreements (someone confirms, or the group clearly accepts), not one-off suggestions. Always cite the message ids where it was proposed and agreed.",
+        "input_schema": {"type": "object", "properties": {
+            "topic": {"type": "string", "description": "Short topic, e.g. 'laundry', 'groceries', 'chores'"},
+            "summary": {"type": "string", "description": "One sentence stating the decision"},
+            "source_ids": {"type": "array", "items": {"type": "string"}},
+        }, "required": ["topic", "summary", "source_ids"]},
     },
     {
         "name": "add_task",

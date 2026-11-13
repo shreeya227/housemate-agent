@@ -10,6 +10,7 @@ After the answer, we check grounding: every message id Claude cites must be one
 that a tool actually returned during this run. Anything else is flagged.
 
 Run:  python -m housemate.agent "What did we decide about laundry on weekends?"
+      python -m housemate.agent --extract
 """
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ from pathlib import Path
 from housemate.tools import TOOL_SCHEMAS, House, run_tool
 
 MODEL = os.environ.get("HOUSEMATE_MODEL", "claude-sonnet-5-5")
-MAX_STEPS = 8
+MAX_STEPS = 12
 
 SYSTEM_PROMPT = """You are HouseMate, an assistant for a shared house of 7 housemates.
 Use the tools to look things up. Never answer house questions from memory.
@@ -102,7 +103,11 @@ def main() -> None:
         sys.exit("Missing ANTHROPIC_API_KEY. Add it to a .env file in this folder.")
     import anthropic  # imported here so tests run without the package or a key
 
-    question = " ".join(sys.argv[1:]) or "What did we decide about laundry on weekends?"
+    from housemate.extract import EXTRACT_REQUEST, score_extraction
+
+    args = sys.argv[1:]
+    extract = args[:1] == ["--extract"]
+    question = EXTRACT_REQUEST if extract else (" ".join(args) or "What did we decide about laundry on weekends?")
     house = House.from_data()
     result = run_agent(question, anthropic.Anthropic(), house)
 
@@ -113,8 +118,16 @@ def main() -> None:
         print(f"\nWARNING: cited ids no tool returned: {result.unverified_ids}")
     if house.grocery_list:
         print("\nGrocery list:", ", ".join(g["item"] for g in house.grocery_list))
+    if house.decisions:
+        print("\nDecisions recorded:", *[f"[{d['topic']}] {d['summary']} {d['source_ids']}" for d in house.decisions], sep="\n  ")
     if house.tasks:
-        print("\nTasks:", *[f"{t['title']} -> {t['assignee']}" for t in house.tasks], sep="\n  ")
+        print("\nTasks:", *[f"{t['title']} -> {t['assignee']} {t['due']} {t['source_ids']}" for t in house.tasks], sep="\n  ")
+    if extract:
+        score = score_extraction(house)
+        print(f"\nDecision recall: {score['decision_recall']:.0%}  missed: {score['missed_decisions']}")
+        print(f"Task recall:     {score['task_recall']:.0%}  missed: {score['missed_tasks']}")
+        if score["extra_decisions_to_review"]:
+            print("Extra decisions to review:", score["extra_decisions_to_review"])
 
 
 if __name__ == "__main__":
