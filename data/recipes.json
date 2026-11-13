@@ -1,0 +1,8 @@
+[
+ {"id":"r1","name":"Dal tadka","serves":4,"vegetarian":true,"ingredients":{"red lentils":"2 cups","onion":"1","tomato":"2","garlic":"4 cloves","cumin seeds":"1 tsp","turmeric":"1 tsp","oil":"2 tbsp"},"tags":["nepali","indian","quick"]},
+ {"id":"r2","name":"Vegetable fried rice","serves":4,"vegetarian":true,"ingredients":{"rice":"3 cups cooked","eggs":"3","carrot":"2","peas":"1 cup","soy sauce":"3 tbsp","oil":"2 tbsp","garlic":"3 cloves"},"tags":["quick","leftovers"]},
+ {"id":"r3","name":"Aloo tama bodi","serves":6,"vegetarian":true,"ingredients":{"potato":"4","bamboo shoots":"1 cup","black-eyed peas":"2 cups","tomato":"2","onion":"1","turmeric":"1 tsp","oil":"2 tbsp"},"tags":["nepali","curry"]},
+ {"id":"r4","name":"Chicken momo","serves":6,"vegetarian":false,"ingredients":{"ground chicken":"1 lb","flour":"3 cups","onion":"2","ginger":"1 tbsp","garlic":"6 cloves","cilantro":"1 bunch"},"tags":["nepali","weekend"]},
+ {"id":"r5","name":"Chana masala","serves":6,"vegetarian":true,"ingredients":{"chickpeas":"3 cans","onion":"2","tomato":"3","ginger":"1 tbsp","garlic":"4 cloves","garam masala":"2 tsp","oil":"3 tbsp"},"tags":["indian","batch"]},
+ {"id":"r6","name":"Pasta primavera","serves":4,"vegetarian":true,"ingredients":{"pasta":"1 lb","zucchini":"1","bell pepper":"2","garlic":"3 cloves","olive oil":"3 tbsp","parmesan":"1/2 cup"},"tags":["quick"]}
+]
