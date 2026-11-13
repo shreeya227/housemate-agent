@@ -3,6 +3,8 @@
 Every chat message gets a stable ID (msg-001, msg-002, ...) so that later,
 when the agent answers a question, it can point back to the exact message.
 """
+from __future__ import annotations
+
 import json
 import re
 from dataclasses import dataclass
