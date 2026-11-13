@@ -25,6 +25,7 @@ from housemate.tools import TOOL_SCHEMAS, House, run_tool
 
 MODEL = os.environ.get("HOUSEMATE_MODEL", "claude-sonnet-5-5")
 MAX_STEPS = 12
+MAX_TOKENS = 4096  # room for many tool calls in one response
 
 SYSTEM_PROMPT = """You are HouseMate, an assistant for a shared house of 7 housemates.
 Use the tools to look things up. Never answer house questions from memory.
@@ -44,6 +45,7 @@ class AgentResult:
     steps: list = field(default_factory=list)       # every tool call, for debugging and demos
     cited_ids: list = field(default_factory=list)   # ids cited in the answer
     unverified_ids: list = field(default_factory=list)  # cited but never returned by a tool
+    stop_reason: str = ""  # why the run ended, for debugging
 
 
 def _block_get(block, key):
@@ -60,16 +62,22 @@ def run_agent(question: str, client, house: House | None = None,
 
     for _ in range(max_steps):
         response = client.messages.create(
-            model=model, max_tokens=1024, system=SYSTEM_PROMPT,
+            model=model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
             tools=TOOL_SCHEMAS, messages=messages,
         )
         messages.append({"role": "assistant", "content": response.content})
+
+        if response.stop_reason not in ("tool_use", "end_turn", "stop_sequence"):
+            # e.g. "max_tokens": the response was cut off. Never treat that as success.
+            return AgentResult(f"Stopped early: Claude's response ended with '{response.stop_reason}'.",
+                               steps, stop_reason=response.stop_reason)
 
         if response.stop_reason != "tool_use":
             answer = "".join(_block_get(b, "text") for b in response.content
                              if _block_get(b, "type") == "text").strip()
             cited = list(dict.fromkeys(CITATION.findall(answer)))
-            return AgentResult(answer, steps, cited, [c for c in cited if c not in seen_ids])
+            return AgentResult(answer, steps, cited, [c for c in cited if c not in seen_ids],
+                               stop_reason=response.stop_reason)
 
         tool_results = []
         for block in response.content:
@@ -85,7 +93,7 @@ def run_agent(question: str, client, house: House | None = None,
             })
         messages.append({"role": "user", "content": tool_results})
 
-    return AgentResult("Stopped: reached the step limit before finishing.", steps)
+    return AgentResult("Stopped: reached the step limit before finishing.", steps, stop_reason="step_limit")
 
 
 def _load_env(path: Path = Path(".env")) -> None:
@@ -113,7 +121,8 @@ def main() -> None:
 
     for i, step in enumerate(result.steps, 1):
         print(f"[step {i}] {step['tool']}({json.dumps(step['input'])})")
-    print("\n" + result.answer)
+    print("\n" + (result.answer or "(no text answer)"))
+    print(f"\n(stop reason: {result.stop_reason}, steps: {len(result.steps)})")
     if result.unverified_ids:
         print(f"\nWARNING: cited ids no tool returned: {result.unverified_ids}")
     if house.grocery_list:

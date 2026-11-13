@@ -86,3 +86,17 @@ def test_step_limit_stops_endless_loops():
     result = run_agent("loop forever", FakeClient(looping), max_steps=3)
     assert result.answer.startswith("Stopped")
     assert len(result.steps) == 3
+
+
+def test_cut_off_response_is_reported_not_treated_as_success():
+    # Reproduces the real bug: Claude ran out of output tokens mid tool-call.
+    fake = FakeClient([("max_tokens", [text("Recording decisions now")])])
+    result = run_agent("extract", fake)
+    assert result.stop_reason == "max_tokens"
+    assert result.answer.startswith("Stopped early")
+
+
+def test_requests_enough_output_room_for_many_tool_calls():
+    fake = FakeClient([("end_turn", [text("ok")])])
+    run_agent("hi", fake)
+    assert fake.sent[0]["max_tokens"] >= 4096
