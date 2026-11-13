@@ -40,5 +40,5 @@ def test_extraction_flow_and_scoring():
     score = score_extraction(house)
     assert score["decision_recall"] == 0.75           # missed Sunday dinner
     assert score["missed_decisions"] == ["sunday dinner"]
-    assert round(score["task_recall"], 2) == 0.67     # missed the first Sunday dinner cooks
+    assert score["task_recall"] == 0.5                # 2 of 4 tasks found
     assert score["extra_decisions_to_review"] == []

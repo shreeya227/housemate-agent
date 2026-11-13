@@ -31,6 +31,8 @@ GOLDEN_TASKS = {
     "trash and recycling (Fuchu)": {"msg-002"},
     "first costco run (Anish)": {"msg-010", "msg-011"},
     "first sunday dinner (Shreeya and Fuchu)": {"msg-014"},
+    # Added after the first real run: the agent found this and the original key had missed it.
+    "put bathroom rotation in House Tasks (Shreeya)": {"msg-004"},
 }
 
 
